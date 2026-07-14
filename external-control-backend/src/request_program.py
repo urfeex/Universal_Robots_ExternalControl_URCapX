@@ -55,33 +55,28 @@ class RequestProgram(object):
         program = ""
         connection_timeout = 5
         receive_timeout = 1.0
-        try:
-            # Create a socket connection with the robot IP and port number defined above
-            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            s.settimeout(connection_timeout)
+
+        # Create a socket connection with the robot IP and port number defined above
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.settimeout(connection_timeout)
+        s.connect((self.robotIP, self.port))
+        s.sendall(command.encode('us-ascii'))
+        s.settimeout(receive_timeout)
+        # Receive script code
+        raw_data = b""
+        begin = time.time()
+        while True:
             try:
-                s.connect((self.robotIP, self.port))
+                data = s.recv(1024)
+                if not data:
+                    break  # Connection closed by the server
+                raw_data += data
             except socket.timeout:
-                raise Exception(f"Connection timeout")
-            s.sendall(command.encode('us-ascii'))
-            s.settimeout(receive_timeout)
-            # Receive script code
-            raw_data = b""
-            begin = time.time()
-            while True:
-                try:
-                    data = s.recv(1024)
-                    if not data:
-                        break  # Connection closed by the server
-                    raw_data += data
-                except socket.timeout:
-                    if raw_data != b"":
-                        print("Done receiving data")
-                        break
-            program = raw_data.decode("us-ascii")
-            s.close()
-            if not bool(program and program.strip()):
-                raise Exception(f"Did not receive any script lines")
-            return program
-        except Exception as e:
-            raise Exception(f"Connectivity problem with {self.robotIP}:{self.port}: {e}")
+                if raw_data != b"":
+                    print("Done receiving data")
+                    break
+        program = raw_data.decode("us-ascii")
+        s.close()
+        if not bool(program and program.strip()):
+            raise Exception(f"Did not receive any script lines")
+        return program
